@@ -5,30 +5,10 @@ import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import {ILockTOSDividendProxy} from "interfaces/ILockTOSDividendProxy.sol";
-import {IStakingProxy} from "interfaces/IStakingProxy.sol";
+import "./proxy/ProxyBaseStorage.sol";
+import "./StakingManagerStorageV1.sol";
 
-contract StakingManager is Ownable {
-    uint256 stakeId;
-
-    uint256 lastUpdateBlockNumber;
-
-    address[] rewardTokens;
-
-    mapping(address => uint256) accRewardsPerTOS;
-
-    address TOS;
-    ILockTOSDividendProxy lockTOSDividendProxy;
-    IStakingProxy stakingProxy;
-
-    struct StakerInfo {
-        mapping(address => uint256) claimedRewardTokens;
-        uint256 stakedTOS;
-    }
-    mapping(address => StakerInfo) stakerInfos;
-
-    uint256 totalStakedTOS;
-
+contract StakingManager is ProxyBaseStorage, Ownable, StakingManagerStorageV1 {
     modifier initialized() {
         require(stakeId != 0, "StakingManager: not initialized");
         _;
@@ -53,7 +33,7 @@ contract StakingManager is Ownable {
         stakeId = stakingProxy.stake(1000 * 1e18);
     }
 
-    function addTOS(uint256 amount) external initialized {
+    function addTOS(uint256 amount) external {
         StakerInfo storage info = stakerInfos[_msgSender()];
 
         IERC20(TOS).transferFrom(_msgSender(), address(this), amount);
@@ -63,11 +43,12 @@ contract StakingManager is Ownable {
         totalStakedTOS += amount;
     }
 
-    function increasePeriod(uint256 additionalWeeks) external initialized {
+    function increasePeriod(uint256 additionalWeeks) external {
         stakingProxy.increaseBeforeEndOrNonEnd(stakeId, 0, additionalWeeks);
     }
 
-    function update() external initialized {
+    /// @notice TOS 락업 보상을 가져와서 staker에게 분배
+    function update() external {
         for (uint8 idx = 0; idx < rewardTokens.length; idx++) {
             address rewardToken = rewardTokens[idx];
 
@@ -93,13 +74,28 @@ contract StakingManager is Ownable {
         }
     }
 
-    function claim(address rewardToken) external initialized {
+    /// @notice 특정 리워드 토큰만 claim 할 때 사용
+    function claimToken(address token) external {
         StakerInfo storage info = stakerInfos[_msgSender()];
-        uint256 claimableTokens = ((info.stakedTOS *
-            accRewardsPerTOS[rewardToken]) / 1e18) -
-            info.claimedRewardTokens[rewardToken];
+        uint256 claimableTokens = ((info.stakedTOS * accRewardsPerTOS[token]) /
+            1e18) - info.claimedRewardTokens[token];
 
-        info.claimedRewardTokens[rewardToken] += claimableTokens;
-        IERC20(rewardToken).transfer(_msgSender(), claimableTokens);
+        info.claimedRewardTokens[token] += claimableTokens;
+        IERC20(token).transfer(_msgSender(), claimableTokens);
+    }
+
+    /// @notice 여러 리워드 토큰을 한번에 claim 할 때 사용
+    function claimTokens(address[] calldata tokens) external {
+        for (uint8 idx = 0; idx < tokens.length; idx++) {
+            address token = tokens[idx];
+
+            StakerInfo storage info = stakerInfos[_msgSender()];
+            uint256 claimableTokens = ((info.stakedTOS *
+                accRewardsPerTOS[token]) / 1e18) -
+                info.claimedRewardTokens[token];
+
+            info.claimedRewardTokens[token] += claimableTokens;
+            IERC20(token).transfer(_msgSender(), claimableTokens);
+        }
     }
 }
