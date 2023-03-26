@@ -41,6 +41,7 @@ contract StakingManager is ProxyBaseStorage, StakingManagerStorageV1 {
         StakerInfo storage info = stakerInfos[_msgSender()];
 
         IERC20(TOS).transferFrom(_msgSender(), address(this), amount);
+        IERC20(TOS).approve(address(stakingProxy), amount);
         stakingProxy.increaseBeforeEndOrNonEnd(stakeId, amount);
 
         info.stakedTOS += amount;
