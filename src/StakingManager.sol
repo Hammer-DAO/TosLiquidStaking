@@ -32,7 +32,9 @@ contract StakingManager is ProxyBaseStorage, StakingManagerStorageV1 {
 
     function initialize() public onlyOwner {
         require(stakeId == 0, "StakingManager: already initialized");
-        stakeId = stakingProxy.stake(1000 * 1e18);
+        IERC20(TOS).transferFrom(_msgSender(), address(this), 1000 * 1e18);
+        IERC20(TOS).approve(address(stakingProxy), 1000 * 1e18);
+        stakeId = stakingProxy.stakeGetStos(1000 * 1e18, 10);
     }
 
     function addTOS(uint256 amount) external {

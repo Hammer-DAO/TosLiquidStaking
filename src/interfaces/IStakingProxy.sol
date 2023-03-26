@@ -13,5 +13,8 @@ interface IStakingProxy {
         uint256 _unlockWeeks
     ) external;
 
-    function stake(uint256 _amount) external returns (uint256 stakeId);
+    function stakeGetStos(
+        uint256 _amount,
+        uint256 _periodWeeks
+    ) external returns (uint256 stakeId);
 }
