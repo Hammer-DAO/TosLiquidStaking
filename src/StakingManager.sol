@@ -37,14 +37,37 @@ contract StakingManager is ProxyBaseStorage, StakingManagerStorageV1 {
         stakeId = stakingProxy.stakeGetStos(1000 * 1e18, 156);
     }
 
-    function addTOS(uint256 amount) external {
-        StakerInfo storage info = stakerInfos[_msgSender()];
+    function addRewardToken(address token) external onlyOwner {
+        rewardTokens.push(token);
+    }
 
+    function removeRewardToken(address token) external onlyOwner {
+        for (uint8 idx; idx < rewardTokens.length; idx++) {
+            if (rewardTokens[idx] == token) {
+                address lastItem = rewardTokens[rewardTokens.length - 1];
+                rewardTokens[idx] = lastItem;
+                rewardTokens.pop();
+                return;
+            }
+        }
+    }
+
+    function addTOS(uint256 amount) external {
         IERC20(TOS).transferFrom(_msgSender(), address(this), amount);
         IERC20(TOS).approve(address(stakingProxy), amount);
         stakingProxy.increaseBeforeEndOrNonEnd(stakeId, amount);
 
-        info.stakedTOS += amount;
+        stakedTOS[_msgSender()] += amount;
+
+        // 새로 추가된 TOS는 기존에 쌓인 에어드랍 물량에 대한 권한이 없음
+        for (uint256 idx; idx < rewardTokens.length; idx++) {
+            address rewardToken = rewardTokens[idx];
+
+            claimedRewardTokens[rewardToken][_msgSender()] +=
+                (accRewardsPerTOS[rewardToken] * stakedTOS[_msgSender()]) /
+                1e18;
+        }
+
         totalStakedTOS += amount;
     }
 
@@ -54,12 +77,12 @@ contract StakingManager is ProxyBaseStorage, StakingManagerStorageV1 {
 
     /// @notice LockTOSDividend 컨트랙트에서 TOS 락업 보상을 가져와서 staker에게 분배
     function update(address rewardToken) external {
-        uint256 claimable = lockTOSDividendProxy.claimable(
+        uint256 claimableTokens = lockTOSDividendProxy.claimable(
             address(this),
             rewardToken
         );
 
-        if (claimable > 0) {
+        if (claimableTokens > 0) {
             uint256 beforeBalance = IERC20(rewardToken).balanceOf(
                 address(this)
             );
@@ -76,11 +99,12 @@ contract StakingManager is ProxyBaseStorage, StakingManagerStorageV1 {
 
     /// @notice 특정 리워드 토큰만 claim 할 때 사용
     function claimToken(address token) external {
-        StakerInfo storage info = stakerInfos[_msgSender()];
-        uint256 claimableTokens = ((info.stakedTOS * accRewardsPerTOS[token]) /
-            1e18) - info.claimedRewardTokens[token];
+        uint256 claimableTokens = ((stakedTOS[_msgSender()] *
+            accRewardsPerTOS[token]) / 1e18) -
+            claimedRewardTokens[token][_msgSender()];
 
-        info.claimedRewardTokens[token] += claimableTokens;
+        claimedRewardTokens[token][_msgSender()] += claimableTokens;
+
         IERC20(token).transfer(_msgSender(), claimableTokens);
     }
 
@@ -89,21 +113,19 @@ contract StakingManager is ProxyBaseStorage, StakingManagerStorageV1 {
         for (uint8 idx = 0; idx < tokens.length; idx++) {
             address token = tokens[idx];
 
-            StakerInfo storage info = stakerInfos[_msgSender()];
-            uint256 claimableTokens = ((info.stakedTOS *
+            uint256 claimableTokens = ((stakedTOS[_msgSender()] *
                 accRewardsPerTOS[token]) / 1e18) -
-                info.claimedRewardTokens[token];
+                claimedRewardTokens[token][_msgSender()];
 
-            info.claimedRewardTokens[token] += claimableTokens;
+            claimedRewardTokens[token][_msgSender()] += claimableTokens;
             IERC20(token).transfer(_msgSender(), claimableTokens);
         }
     }
 
     function claimable(address token) external view returns (uint256) {
-        StakerInfo storage info = stakerInfos[_msgSender()];
-
-        uint256 claimableTokens = ((info.stakedTOS * accRewardsPerTOS[token]) /
-            1e18) - info.claimedRewardTokens[token];
+        uint256 claimableTokens = ((stakedTOS[_msgSender()] *
+            accRewardsPerTOS[token]) / 1e18) -
+            claimedRewardTokens[token][_msgSender()];
 
         return claimableTokens;
     }

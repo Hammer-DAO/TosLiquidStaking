@@ -18,11 +18,10 @@ contract StakingManagerStorageV1 {
     mapping(address => uint256) accRewardsPerTOS;
 
     /// 사용자별 위임한 TOS 총량과 claim 받아간 에어드랍 토큰 총량 저장
-    struct StakerInfo {
-        mapping(address => uint256) claimedRewardTokens;
-        uint256 stakedTOS;
-    }
-    mapping(address => StakerInfo) stakerInfos;
+    mapping(address => mapping(address => uint256)) claimedRewardTokens;
+    mapping(address => uint256) stakedTOS;
+
+    address[] public rewardTokens;
 
     /// 스테이킹된 TOS 총량, TOS를 위임한 사용자들의 에어드랍 지분을 계산할 때 사용
     uint256 totalStakedTOS;
