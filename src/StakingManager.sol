@@ -34,7 +34,7 @@ contract StakingManager is ProxyBaseStorage, StakingManagerStorageV1 {
         require(stakeId == 0, "StakingManager: already initialized");
         IERC20(TOS).transferFrom(_msgSender(), address(this), 1000 * 1e18);
         IERC20(TOS).approve(address(stakingProxy), 1000 * 1e18);
-        stakeId = stakingProxy.stakeGetStos(1000 * 1e18, 10);
+        stakeId = stakingProxy.stakeGetStos(1000 * 1e18, 156);
     }
 
     function addTOS(uint256 amount) external {
@@ -67,7 +67,8 @@ contract StakingManager is ProxyBaseStorage, StakingManagerStorageV1 {
             uint256 afterBalance = IERC20(rewardToken).balanceOf(address(this));
 
             uint256 rewardAmount = afterBalance - beforeBalance;
-            accRewardsPerTOS[rewardToken] += rewardAmount / totalStakedTOS;
+            accRewardsPerTOS[rewardToken] += ((rewardAmount * 1e18) /
+                totalStakedTOS);
 
             emit Update(rewardToken, rewardAmount);
         }
@@ -96,5 +97,14 @@ contract StakingManager is ProxyBaseStorage, StakingManagerStorageV1 {
             info.claimedRewardTokens[token] += claimableTokens;
             IERC20(token).transfer(_msgSender(), claimableTokens);
         }
+    }
+
+    function claimable(address token) external view returns (uint256) {
+        StakerInfo storage info = stakerInfos[_msgSender()];
+
+        uint256 claimableTokens = ((info.stakedTOS * accRewardsPerTOS[token]) /
+            1e18) - info.claimedRewardTokens[token];
+
+        return claimableTokens;
     }
 }
