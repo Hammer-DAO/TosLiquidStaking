@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import "./proxy/ProxyBaseStorage.sol";
 import "./StakingManagerStorageV1.sol";
 
-contract StakingManager is ProxyBaseStorage, Ownable, StakingManagerStorageV1 {
+contract StakingManager is ProxyBaseStorage, StakingManagerStorageV1 {
+    event Update(address rewardToken, uint256 rewardAmount);
+
     modifier initialized() {
         require(stakeId != 0, "StakingManager: not initialized");
         _;
@@ -24,6 +25,7 @@ contract StakingManager is ProxyBaseStorage, Ownable, StakingManagerStorageV1 {
         stakingProxy = IStakingProxy(_stakingProxy);
     }
 
+    /// @notice TOS 주소 설정
     function setTOS(address _tos) external onlyOwner {
         TOS = _tos;
     }
@@ -47,30 +49,24 @@ contract StakingManager is ProxyBaseStorage, Ownable, StakingManagerStorageV1 {
         stakingProxy.increaseBeforeEndOrNonEnd(stakeId, 0, additionalWeeks);
     }
 
-    /// @notice TOS 락업 보상을 가져와서 staker에게 분배
-    function update() external {
-        for (uint8 idx = 0; idx < rewardTokens.length; idx++) {
-            address rewardToken = rewardTokens[idx];
+    /// @notice LockTOSDividend 컨트랙트에서 TOS 락업 보상을 가져와서 staker에게 분배
+    function update(address rewardToken) external {
+        uint256 claimable = lockTOSDividendProxy.claimable(
+            address(this),
+            rewardToken
+        );
 
-            uint256 claimable = lockTOSDividendProxy.claimable(
-                address(this),
-                rewardToken
+        if (claimable > 0) {
+            uint256 beforeBalance = IERC20(rewardToken).balanceOf(
+                address(this)
             );
+            lockTOSDividendProxy.claim(rewardToken);
+            uint256 afterBalance = IERC20(rewardToken).balanceOf(address(this));
 
-            if (claimable > 0) {
-                uint256 beforeBalance = IERC20(rewardToken).balanceOf(
-                    address(this)
-                );
-                lockTOSDividendProxy.claim(rewardToken);
-                uint256 afterBalance = IERC20(rewardToken).balanceOf(
-                    address(this)
-                );
+            uint256 rewardAmount = afterBalance - beforeBalance;
+            accRewardsPerTOS[rewardToken] += rewardAmount / totalStakedTOS;
 
-                accRewardsPerTOS[rewardToken] +=
-                    afterBalance -
-                    beforeBalance /
-                    totalStakedTOS;
-            }
+            emit Update(rewardToken, rewardAmount);
         }
     }
 

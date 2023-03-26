@@ -13,10 +13,6 @@ contract StakingManagerStorageV1 {
     /// TOS를 스테이킹하면 할당되는 ID, 컨트랙트에서 위임받은 모든 TOS는 하나의 Stake ID로 관리
     uint256 stakeId;
 
-    /// 에어드랍 토큰 리스트
-    /// 이 리스트에 저장된 주소를 순회하면서 보상을 claim해서 컨트랙트에 쌓아두고 사용자들이 claim 해가는 구조
-    address[] rewardTokens;
-
     /// TOS 토큰 1개당 받을 수 있는 에어드랍 토큰 수량
     /// 이 값은 계속 증가하며, 이미 받아간 보상은 claimedRewardTokens으로 별도 관리
     mapping(address => uint256) accRewardsPerTOS;
