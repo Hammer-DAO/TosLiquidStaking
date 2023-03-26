@@ -64,7 +64,7 @@ contract StakingManager is ProxyBaseStorage, StakingManagerStorageV1 {
             address rewardToken = rewardTokens[idx];
 
             claimedRewardTokens[rewardToken][_msgSender()] +=
-                (accRewardsPerTOS[rewardToken] * stakedTOS[_msgSender()]) /
+                (accRewardsPerTOS[rewardToken] * amount) /
                 1e18;
         }
 
