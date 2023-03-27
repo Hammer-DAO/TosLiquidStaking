@@ -53,12 +53,6 @@ contract StakingManager is ProxyBaseStorage, StakingManagerStorageV1 {
     }
 
     function addTOS(uint256 amount) external {
-        IERC20(TOS).transferFrom(_msgSender(), address(this), amount);
-        IERC20(TOS).approve(address(stakingProxy), amount);
-        stakingProxy.increaseBeforeEndOrNonEnd(stakeId, amount);
-
-        stakedTOS[_msgSender()] += amount;
-
         // 새로 추가된 TOS는 기존에 쌓인 에어드랍 물량에 대한 권한이 없음
         for (uint256 idx; idx < rewardTokens.length; idx++) {
             address rewardToken = rewardTokens[idx];
@@ -68,7 +62,17 @@ contract StakingManager is ProxyBaseStorage, StakingManagerStorageV1 {
                 1e18;
         }
 
+        stakedTOS[_msgSender()] += amount;
         totalStakedTOS += amount;
+        IERC20(TOS).transferFrom(_msgSender(), address(this), amount);
+    }
+
+    /// @notice addTOS()로 쌓인 TOS를 한번에 스테이킹하는 method
+    /// @dev stake는 목요일 오전 9시 직전에 한번만 호출하는게 가장 좋음
+    function stake() external {
+        uint256 amount = IERC20(TOS).balanceOf(address(this));
+        IERC20(TOS).approve(address(stakingProxy), amount);
+        stakingProxy.increaseBeforeEndOrNonEnd(stakeId, amount);
     }
 
     function increasePeriod(uint256 additionalWeeks) external {
